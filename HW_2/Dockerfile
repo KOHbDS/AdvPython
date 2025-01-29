@@ -1,9 +1,9 @@
-FROM python:3.12.1
+FROM python:3.10
 
-WORKDIR /app
+WORKDIR /HW_2
 
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
