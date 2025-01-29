@@ -1,0 +1,4 @@
+aiogram==3.17.0
+nest-asyncio==1.6.0
+pandas==2.2.3
+matplotlib==3.9.3
