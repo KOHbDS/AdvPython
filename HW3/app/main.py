@@ -60,13 +60,18 @@ async def startup_event():
         
         # Проверка подключения к Redis
         try:
-            redis_result = cache.redis_client.ping()
-            logger.info(f"Redis connection successful: {redis_result}")
+            if cache.redis_client:
+                redis_result = cache.redis_client.ping()
+                logger.info(f"Redis connection successful: {redis_result}")
+            else:
+                logger.warning("Redis client is not initialized. Cache functionality will be limited.")
         except Exception as e:
             logger.error(f"Redis connection failed: {str(e)}")
+            logger.error("Application will continue without Redis caching")
     except Exception as e:
         logger.error(f"Startup check failed: {str(e)}")
         logger.error(traceback.format_exc())
+        logger.warning("Application may not function correctly due to startup checks failing")
 
 # Endpoint для регистрации пользователя
 @app.post("/users/", response_model=schemas.UserResponse)

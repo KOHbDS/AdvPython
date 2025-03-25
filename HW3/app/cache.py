@@ -3,6 +3,10 @@ import json
 from typing import Any, Optional
 from datetime import datetime
 from .config import REDIS_HOST, REDIS_PORT, REDIS_DB, TESTING
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Префиксы ключей для различных типов данных
 LINK_PREFIX = "link:"
@@ -12,15 +16,25 @@ STATS_PREFIX = "stats:"
 CACHE_TTL = 3600  # 1 час
 
 # Создаем клиент Redis только если не в режиме тестирования
+redis_client = None
 if not TESTING:
     try:
-        redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+        # Проверяем наличие REDIS_URL (Render может предоставить его)
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            logger.info("Connected to Redis using REDIS_URL")
+        else:
+            redis_client = redis.Redis(
+                host=REDIS_HOST, 
+                port=REDIS_PORT, 
+                db=REDIS_DB, 
+                decode_responses=True
+            )
+            logger.info(f"Connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
     except Exception as e:
-        print(f"Redis connection error: {e}")
+        logger.error(f"Redis connection error: {e}")
         redis_client = None
-else:
-    # В тестовом режиме используем заглушку вместо Redis
-    redis_client = None
 
 # Заглушка для кэша в тестовом режиме
 _memory_cache = {}
