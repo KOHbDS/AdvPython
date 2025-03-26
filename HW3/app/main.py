@@ -1,8 +1,9 @@
 import logging
 from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Request
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from .custom_docs import setup_custom_docs
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
@@ -53,6 +54,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+setup_custom_docs(app)
 
 # Middleware для обработки исключений
 @app.middleware("http")
@@ -475,6 +477,41 @@ async def custom_swagger_ui_html():
         swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
     )
+
+@app.get("/test-docs", response_class=HTMLResponse)
+async def test_docs():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Test Documentation</title>
+        </head>
+        <body>
+            <h1>Test Documentation Page</h1>
+            <p>If you can see this page, HTML rendering works correctly.</p>
+            <script>
+                console.log('JavaScript is working!');
+                document.body.style.backgroundColor = '#f0f0f0';
+            </script>
+        </body>
+    </html>
+    """
+    return html_content
+
+@app.get("/openapi.json", include_in_schema=False)
+async def get_open_api_endpoint():
+    return JSONResponse(get_openapi(title=app.title, version=app.version, routes=app.routes))
+
+
+@app.get("/api-docs", include_in_schema=False)
+async def custom_redoc():
+    return get_redoc_html(
+        openapi_url="/openapi.json",
+        title=f"{app.title} - ReDoc",
+        redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js",
+    )
+
+
 
 @app.delete("/links/{short_code}", status_code=204)
 def delete_link(
