@@ -15,7 +15,7 @@ class UserResponse(UserBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Модели для ссылок
 class LinkBase(BaseModel):
@@ -36,7 +36,7 @@ class LinkResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class LinkStats(LinkResponse):
     clicks: int
@@ -45,7 +45,7 @@ class LinkStats(LinkResponse):
     owner_id: Optional[int] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Модели для токенов
 class Token(BaseModel):
@@ -64,4 +64,4 @@ class ExpiredLinkResponse(BaseModel):
     total_clicks: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
