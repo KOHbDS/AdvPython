@@ -7,7 +7,6 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-# Значение по умолчанию из переменной среды или 90 дней
 DEFAULT_UNUSED_DAYS = int(os.getenv("DEFAULT_UNUSED_DAYS", "90"))
 
 def cleanup_expired_links(db: Session) -> None:
@@ -34,7 +33,6 @@ def cleanup_expired_links(db: Session) -> None:
             db.add(expired_link)
             link.is_active = False
             
-            # Удаляем из кэша
             cache.delete_link_cache(link.short_code)
         
         db.commit()
@@ -61,8 +59,6 @@ def cleanup_unused_links(db: Session, days: int = DEFAULT_UNUSED_DAYS) -> None:
         for link in unused_links:
             logger.debug(f"Deactivating unused link: {link.short_code}")
             link.is_active = False
-            
-            # Удаляем из кэша
             cache.delete_link_cache(link.short_code)
         
         db.commit()

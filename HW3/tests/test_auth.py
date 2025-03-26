@@ -14,21 +14,20 @@ def test_create_user(client, db):
     assert "id" in data
     assert "created_at" in data
     
-    # Проверяем, что пользователь действительно создан в базе
     db_user = db.query(models.User).filter(models.User.username == "newuser").first()
     assert db_user is not None
     assert db_user.email == "new@example.com"
 
 def test_create_user_invalid_data(client, db):
     """Тест создания пользователя с невалидными данными"""
-    # Слишком короткий пароль
+
     response = client.post(
         "/users/",
         json={"username": "newuser", "email": "new@example.com", "password": "short"}
     )
     assert response.status_code == 422
     
-    # Невалидный email
+
     response = client.post(
         "/users/",
         json={"username": "newuser", "email": "invalid-email", "password": "password123"}

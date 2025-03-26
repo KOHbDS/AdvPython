@@ -6,18 +6,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
 from fastapi.testclient import TestClient
+import pytest
+import asyncio
+from pytest_asyncio import fixture as asyncio_fixture
 
-# Устанавливаем флаг тестирования
 os.environ["TESTING"] = "True"
 
-# Добавляем корневую директорию проекта в sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.database import Base, get_db
 from app.main import app
 from app import models, auth
 
-# Настройка тестовой базы данных
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine: Engine = create_engine(
@@ -31,24 +31,18 @@ def db() -> Generator[Session, None, None]:
     """
     Создает тестовую базу данных и возвращает сессию
     """
-    # Создаем таблицы
     Base.metadata.create_all(bind=engine)
 
-    # Создаем транзакцию
     connection = engine.connect()
     transaction = connection.begin()
-
-    # Создаем сессию
     session = TestingSessionLocal(bind=connection)
 
     yield session
 
-    # Закрываем сессию и откатываем транзакцию
     session.close()
     transaction.rollback()
     connection.close()
 
-    # Удаляем таблицы
     Base.metadata.drop_all(bind=engine)
 
 @pytest.fixture
@@ -62,15 +56,12 @@ def client(db: Session) -> Generator[TestClient, None, None]:
         finally:
             pass
     
-    # Переопределяем зависимость get_db
     app.dependency_overrides[get_db] = override_get_db
     
-    # Создаем тестовый клиент
     test_client = TestClient(app)
     
     yield test_client
 
-    # Очищаем переопределения зависимостей
     app.dependency_overrides.clear()
 
 @pytest.fixture
@@ -84,12 +75,10 @@ def test_user(db: Session) -> models.User:
         "password": "password123"
     }
     
-    # Проверяем, существует ли пользователь
     db_user = db.query(models.User).filter(models.User.username == user_data["username"]).first()
     if db_user:
         return db_user
     
-    # Создаем пользователя
     hashed_password = auth.get_password_hash(user_data["password"])
     db_user = models.User(
         username=user_data["username"],
@@ -112,3 +101,10 @@ def auth_token(client: TestClient, test_user: models.User) -> str:
         data={"username": test_user.username, "password": "password123"}
     )
     return response.json()["access_token"]
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for each test case."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()

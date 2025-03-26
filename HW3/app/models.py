@@ -8,7 +8,7 @@ from .database import Base
 
 class User(Base):
     __tablename__ = "users"
-    __allow_unmapped__ = True  # Добавляем эту строку
+    __allow_unmapped__ = True
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
@@ -21,7 +21,7 @@ class User(Base):
 
 class Link(Base):
     __tablename__ = "links"
-    __allow_unmapped__ = True  # Добавляем эту строку
+    __allow_unmapped__ = True
 
     id = Column(Integer, primary_key=True, index=True)
     short_code = Column(String(20), unique=True, index=True)
@@ -38,7 +38,7 @@ class Link(Base):
 
 class ExpiredLink(Base):
     __tablename__ = "expired_links"
-    __allow_unmapped__ = True  # Добавляем эту строку
+    __allow_unmapped__ = True
 
     id = Column(Integer, primary_key=True, index=True)
     short_code = Column(String(20), index=True)

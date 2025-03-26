@@ -12,10 +12,10 @@ redis==4.6.0
 python-multipart==0.0.6
 python-dotenv==1.0.0
 gunicorn==21.2.0
-httpx==0.24.1  # Для тестирования
+httpx==0.24.1
 pytest==7.4.0
 pytest-cov==4.1.0
-pytest-asyncio==0.21.1  # Для тестирования
-tenacity==8.2.3  # Для повторных попыток подключения
-loguru==0.7.0  # Улучшенное логирование
-
+pytest-asyncio==0.21.1
+tenacity==8.2.3
+loguru==0.7.0
+locust

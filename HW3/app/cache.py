@@ -11,13 +11,10 @@ logger = logging.getLogger(__name__)
 LINK_PREFIX = "link:"
 STATS_PREFIX = "stats:"
 
-# Время жизни кэша в секундах (1 час)
 CACHE_TTL = int(os.getenv("CACHE_TTL", "3600"))
 
-# Словарь для хранения кэша в памяти (для тестирования)
 _memory_cache: Dict[str, Any] = {}
 
-# Инициализация Redis-клиента
 redis_client = None
 if not TESTING:
     try:

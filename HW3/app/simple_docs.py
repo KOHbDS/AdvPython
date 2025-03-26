@@ -9,7 +9,6 @@ def add_custom_docs(app: FastAPI) -> None:
     Args:
         app: Экземпляр FastAPI приложения
     """
-    # Отключаем стандартную документацию
     app.docs_url = None
     
     @app.get("/docs", response_class=HTMLResponse)

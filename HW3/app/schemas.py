@@ -2,7 +2,6 @@ from pydantic import BaseModel, HttpUrl, EmailStr, Field
 from typing import Optional, Union, Annotated
 from datetime import datetime
 
-# Модели для пользователей
 class UserBase(BaseModel):
     username: Annotated[str, Field(min_length=3, max_length=50)]
     email: EmailStr
@@ -16,7 +15,6 @@ class UserResponse(UserBase):
     
     model_config = {"from_attributes": True}
 
-# Модели для ссылок
 class LinkBase(BaseModel):
     original_url: HttpUrl
 
@@ -44,7 +42,6 @@ class LinkStats(LinkResponse):
     
     model_config = {"from_attributes": True}
 
-# Модели для токенов
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -52,7 +49,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-# Модель для истекших ссылок
 class ExpiredLinkResponse(BaseModel):
     short_code: str
     original_url: HttpUrl
