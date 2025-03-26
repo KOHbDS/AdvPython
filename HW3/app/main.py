@@ -9,7 +9,8 @@ from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Re
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_redoc_html
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -55,8 +56,8 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Добавляем пользовательскую документацию
-add_custom_docs(app)
+# # Добавляем пользовательскую документацию
+# add_custom_docs(app)
 
 
 @app.get("/")
@@ -716,6 +717,83 @@ def delete_link(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Error deleting link")
 
+@app.get("/docs-v2", response_class=HTMLResponse)
+async def custom_swagger_ui_html():
+    return """
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>URL Shortener API Documentation</title>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+        <style>
+          html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+          *, *:before, *:after { box-sizing: inherit; }
+          body { margin: 0; background: #fafafa; }
+          .swagger-ui .topbar { display: none; }
+        </style>
+      </head>
+      <body>
+        <div id="swagger-ui"></div>
+        <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+        <script>
+          window.onload = function() {
+            // Функция для преобразования OpenAPI 3.1.0 в 3.0.0
+            function convertOpenApiVersion(spec) {
+              if (spec.openapi && spec.openapi.startsWith('3.1')) {
+                spec.openapi = '3.0.0';
+                
+                // Обработка типов данных, которые изменились в 3.1
+                if (spec.components && spec.components.schemas) {
+                  Object.values(spec.components.schemas).forEach(schema => {
+                    if (schema.type === 'null' || (Array.isArray(schema.type) && schema.type.includes('null'))) {
+                      schema.nullable = true;
+                      if (Array.isArray(schema.type)) {
+                        schema.type = schema.type.filter(t => t !== 'null')[0];
+                      } else {
+                        delete schema.type;
+                      }
+                    }
+                  });
+                }
+              }
+              return spec;
+            }
+            
+            // Загрузка спецификации и преобразование версии
+            fetch("/openapi.json")
+              .then(response => response.json())
+              .then(spec => {
+                const convertedSpec = convertOpenApiVersion(spec);
+                
+                // Инициализация Swagger UI с преобразованной спецификацией
+                const ui = SwaggerUIBundle({
+                  spec: convertedSpec,
+                  dom_id: '#swagger-ui',
+                  deepLinking: true,
+                  presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIBundle.SwaggerUIStandalonePreset
+                  ],
+                  layout: "BaseLayout"
+                });
+              })
+              .catch(error => {
+                console.error("Error loading OpenAPI spec:", error);
+                document.getElementById('swagger-ui').innerHTML = 
+                  '<div style="padding: 20px; color: red;">' +
+                  '<h2>Error Loading API Documentation</h2>' +
+                  '<p>Could not load the OpenAPI specification.</p>' +
+                  '<p>Error details: ' + error.message + '</p>' +
+                  '</div>';
+              });
+          };
+        </script>
+      </body>
+    </html>
+    """
+
 
 # Перенаправление по короткой ссылке (должно быть ПОСЛЕ всех специфичных маршрутов)
 @app.get("/{short_code}", response_class=RedirectResponse, status_code=307)
@@ -771,3 +849,4 @@ def redirect_to_url(short_code: str, db: Session = Depends(get_db)) -> str:
         logger.error(f"Error updating click stats: {str(e)}")
         # Продолжаем перенаправление, даже если не удалось обновить статистику
         return original_url
+

@@ -16,7 +16,7 @@ URL Shortener API предоставляет следующие возможно
 | Метод | Путь | Описание |
 |-------|------|----------|
 | GET | `/` | Главная страница с информацией о сервисе |
-| GET | `/docs` | Swagger UI документация |
+| GET | `/docs-v2` | Swagger UI документация |
 | POST | `/links/shorten` | Создание короткой ссылки |
 | GET | `/{short_code}` | Перенаправление по короткой ссылке |
 | GET | `/links/{short_code}` | Получение информации о ссылке |
@@ -159,7 +159,7 @@ LOG_LEVEL=INFO
 docker-compose up -d
 ```
 
-Приложение будет доступно по адресу http://localhost:8000. Документация API доступна по адресу http://localhost:8000/docs.
+Приложение будет доступно по адресу http://localhost:8000. Документация API доступна по адресу http://localhost:8000/docs-v2.
 ```bash
 docker-compose exec web pytest
 ```
