@@ -19,11 +19,11 @@ class UserResponse(UserBase):
 
 # Модели для ссылок
 class LinkBase(BaseModel):
-    original_url: str  # Используем строку вместо HttpUrl
+    original_url: str
 
 class LinkCreate(LinkBase):
     custom_alias: Optional[str] = None
-    expires_at: Optional[Union[str, datetime]] = None  # Позволяем использовать как строку, так и datetime
+    expires_at: Optional[Union[str, datetime]] = None
 
 class LinkUpdate(BaseModel):
     original_url: Optional[HttpUrl] = None

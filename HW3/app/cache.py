@@ -8,18 +8,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Префиксы ключей для различных типов данных
 LINK_PREFIX = "link:"
 STATS_PREFIX = "stats:"
 
-# Время жизни кэша (в секундах)
-CACHE_TTL = 3600  # 1 час
+CACHE_TTL = 3600
 
 # Создаем клиент Redis только если не в режиме тестирования
 redis_client = None
 if not TESTING:
     try:
-        # Проверяем наличие REDIS_URL (Render может предоставить его)
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
             redis_client = redis.from_url(redis_url, decode_responses=True)
@@ -36,7 +33,6 @@ if not TESTING:
         logger.error(f"Redis connection error: {e}")
         redis_client = None
 
-# Заглушка для кэша в тестовом режиме
 _memory_cache = {}
 
 def set_link_cache(short_code: str, url: str) -> None:

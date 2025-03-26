@@ -3,16 +3,16 @@ from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Re
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional, Union
 from datetime import datetime, timedelta
 import shortuuid
 import traceback
 
-# Импорты из вашего проекта
+
 from . import models, schemas, database, auth, cache, background_tasks as bg_tasks
 from .database import engine, get_db
 
-# Настройка логирования в файл
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -35,6 +35,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.get("/")
+async def root():
+    """
+    Root endpoint for URL Shortener API
+    """
+    return {"message": "Welcome to URL Shortener API. Go to /docs for documentation."}
+
+
 # Middleware для обработки исключений
 @app.middleware("http")
 async def log_exceptions(request: Request, call_next):
@@ -53,12 +61,13 @@ async def log_exceptions(request: Request, call_next):
 async def startup_event():
     logger.info("Application startup")
     try:
-        # Проверка подключения к базе данных
         db = next(get_db())
-        result = db.execute("SELECT 1").fetchone()
-        logger.info(f"Database connection successful: {result}")
+        try:
+            result = db.execute(text("SELECT 1")).fetchone()
+            logger.info(f"Database connection successful: {result}")
+        except Exception as e:
+            logger.error(f"Database connection failed: {str(e)}")
         
-        # Проверка подключения к Redis
         try:
             if cache.redis_client:
                 redis_result = cache.redis_client.ping()
@@ -67,11 +76,12 @@ async def startup_event():
                 logger.warning("Redis client is not initialized. Cache functionality will be limited.")
         except Exception as e:
             logger.error(f"Redis connection failed: {str(e)}")
-            logger.error("Application will continue without Redis caching")
+            logger.warning("Application will continue without Redis caching")
     except Exception as e:
         logger.error(f"Startup check failed: {str(e)}")
         logger.error(traceback.format_exc())
         logger.warning("Application may not function correctly due to startup checks failing")
+
 
 # Endpoint для регистрации пользователя
 @app.post("/users/", response_model=schemas.UserResponse)
@@ -118,7 +128,6 @@ def create_short_link(
     logger.debug(f"Received request to create short link: {link}")
     
     try:
-        # Проверка кастомного alias, если он предоставлен
         if link.custom_alias:
             logger.debug(f"Custom alias provided: {link.custom_alias}")
             db_link = db.query(models.Link).filter(models.Link.short_code == link.custom_alias).first()
@@ -127,7 +136,6 @@ def create_short_link(
                 raise HTTPException(status_code=400, detail="Custom alias already in use")
             short_code = link.custom_alias
         else:
-            # Генерация уникального короткого кода
             logger.debug("Generating unique short code")
             while True:
                 short_code = shortuuid.uuid()[:6]
@@ -135,13 +143,11 @@ def create_short_link(
                 if not db_link:
                     break
             logger.debug(f"Generated short code: {short_code}")
-        
-        # Обработка даты истечения срока действия
+
         expires_at = None
         if link.expires_at:
             logger.debug(f"Expiry date provided: {link.expires_at}")
             try:
-                # Если дата передана как строка, преобразуем ее
                 if isinstance(link.expires_at, str):
                     expires_at = datetime.fromisoformat(link.expires_at.replace('Z', '+00:00'))
                 else:
@@ -171,28 +177,22 @@ def create_short_link(
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
         
-        # Кэширование ссылки
         try:
             logger.debug(f"Caching link: {short_code}")
             cache.set_link_cache(short_code, str(link.original_url))
         except Exception as e:
             logger.error(f"Caching error (non-critical): {str(e)}")
-            # Не прерываем выполнение, если кэширование не удалось
-        
-        # Запуск фоновой задачи для очистки истекших ссылок
+
         try:
             logger.debug("Starting background task for cleanup")
             background_tasks.add_task(bg_tasks.cleanup_expired_links, db)
         except Exception as e:
             logger.error(f"Background task error (non-critical): {str(e)}")
-            # Не прерываем выполнение, если запуск фоновой задачи не удался
         
         return db_link
     except HTTPException:
-        # Пробрасываем HTTP исключения
         raise
     except Exception as e:
-        # Логируем любые другие ошибки
         logger.error(f"Unexpected error creating link: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
@@ -207,7 +207,33 @@ def check_link_expiry(link: models.Link, db: Session) -> bool:
         return True
     return False
 
-# ВАЖНО: Перемещаем специфические маршруты выше общего маршрута {short_code}
+
+@app.get("/healthz")
+async def health_check():
+    """
+    Health check endpoint for monitoring
+    """
+    try:
+        db = next(get_db())
+        db.execute(text("SELECT 1")).fetchone()
+        db_status = "healthy"
+    except Exception:
+        db_status = "unhealthy"
+    
+    try:
+        if cache.redis_client and cache.redis_client.ping():
+            redis_status = "healthy"
+        else:
+            redis_status = "unhealthy"
+    except Exception:
+        redis_status = "unhealthy"
+    
+    is_healthy = db_status == "healthy"
+
+    status_code = 200 if is_healthy else 503
+    return {"status": "healthy" if is_healthy else "unhealthy", 
+            "database": db_status,
+            "redis": redis_status}
 
 # Endpoint для поиска ссылки по оригинальному URL
 @app.get("/search-url")
@@ -237,7 +263,6 @@ def get_expired_links(db: Session = Depends(get_db), current_user: models.User =
     """Получение списка истекших ссылок пользователя"""
     logger.debug(f"Getting expired links for user: {current_user.username}")
     
-    # Находим все неактивные ссылки пользователя
     inactive_links = db.query(models.Link).filter(
         models.Link.owner_id == current_user.id,
         models.Link.is_active == False
@@ -245,7 +270,6 @@ def get_expired_links(db: Session = Depends(get_db), current_user: models.User =
     
     logger.debug(f"Found {len(inactive_links)} inactive links")
     
-    # Также проверяем активные ссылки с истекшим сроком действия
     active_links = db.query(models.Link).filter(
         models.Link.owner_id == current_user.id,
         models.Link.is_active == True,
@@ -255,7 +279,6 @@ def get_expired_links(db: Session = Depends(get_db), current_user: models.User =
     
     logger.debug(f"Found {len(active_links)} active links with expired dates")
     
-    # Помечаем активные ссылки с истекшим сроком как неактивные
     for link in active_links:
         link.is_active = False
     
@@ -263,14 +286,12 @@ def get_expired_links(db: Session = Depends(get_db), current_user: models.User =
         db.commit()
         logger.debug("Updated status of expired links")
     
-    # Объединяем результаты
     all_expired = inactive_links + active_links
     
     if not all_expired:
         logger.debug("No expired links found")
         return []
     
-    # Преобразуем в формат ответа
     result = []
     for link in all_expired:
         result.append({
@@ -283,7 +304,6 @@ def get_expired_links(db: Session = Depends(get_db), current_user: models.User =
     
     return result
 
-# Endpoint для настройки автоматического удаления
 @app.post("/links/cleanup", response_model=dict)
 def cleanup_unused_links(
     days: int,
@@ -295,20 +315,17 @@ def cleanup_unused_links(
     
     if days < 1:
         raise HTTPException(status_code=400, detail="Days must be a positive integer")
-    
-    # Находим и деактивируем ссылки, не использовавшиеся более указанного количества дней
+
     cutoff_date = datetime.now() - timedelta(days=days)
     
     try:
-        # Выполняем очистку непосредственно здесь вместо фоновой задачи
         unused_links = db.query(models.Link).filter(
             models.Link.owner_id == current_user.id,
             models.Link.is_active == True,
             (models.Link.last_used.is_(None) & (models.Link.created_at < cutoff_date)) |
             (models.Link.last_used < cutoff_date)
         ).all()
-        
-        # Деактивируем найденные ссылки
+
         for link in unused_links:
             link.is_active = False
         
@@ -326,8 +343,7 @@ def cleanup_unused_links(
 @app.get("/links/search")
 def search_by_original_url(original_url: str, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_active_user)):
     logger.debug(f"Searching for link with original URL: {original_url}")
-    
-    # Выводим все ссылки пользователя для отладки
+
     all_links = db.query(models.Link).filter(
         models.Link.owner_id == current_user.id,
         models.Link.is_active == True
@@ -355,7 +371,6 @@ def get_link_info(short_code: str, db: Session = Depends(get_db)):
     stats = cache.get_stats_cache(short_code)
     
     if not stats:
-        # Если нет в кэше, ищем в базе данных
         db_link = db.query(models.Link).filter(
             models.Link.short_code == short_code,
             models.Link.is_active == True
@@ -363,8 +378,7 @@ def get_link_info(short_code: str, db: Session = Depends(get_db)):
         
         if not db_link:
             raise HTTPException(status_code=404, detail="Link not found")
-        
-        # Кэшируем статистику
+
         stats = {
             "original_url": db_link.original_url,
             "short_code": db_link.short_code,
@@ -378,7 +392,6 @@ def get_link_info(short_code: str, db: Session = Depends(get_db)):
         
         return db_link
     else:
-        # Преобразуем даты из строк в объекты datetime
         return schemas.LinkStats(
             original_url=stats["original_url"],
             short_code=stats["short_code"],
@@ -392,7 +405,6 @@ def get_link_info(short_code: str, db: Session = Depends(get_db)):
 # Endpoint для получения статистики по ссылке
 @app.get("/links/{short_code}/stats", response_model=schemas.LinkStats)
 def get_link_stats(short_code: str, db: Session = Depends(get_db)):
-    # Используем тот же метод, что и для получения информации о ссылке
     return get_link_info(short_code, db)
 
 # Endpoint для обновления ссылки
@@ -410,17 +422,14 @@ def update_link(
     
     if not db_link:
         raise HTTPException(status_code=404, detail="Link not found")
-    
-    # Проверяем, принадлежит ли ссылка текущему пользователю
+
     if db_link.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this link")
-    
-    # Обновляем поля, если они предоставлены
+
     if link_update.original_url:
         db_link.original_url = str(link_update.original_url)
     
     if link_update.custom_alias:
-        # Проверяем, не занят ли новый alias
         existing_link = db.query(models.Link).filter(
             models.Link.short_code == link_update.custom_alias,
             models.Link.id != db_link.id
@@ -428,13 +437,11 @@ def update_link(
         
         if existing_link:
             raise HTTPException(status_code=400, detail="Custom alias already in use")
-        
-        # Обновляем короткий код
+
         old_short_code = db_link.short_code
         db_link.short_code = link_update.custom_alias
         db_link.custom_alias = link_update.custom_alias
-        
-        # Удаляем старый кэш
+
         cache.delete_link_cache(old_short_code)
     
     if link_update.expires_at:
@@ -443,13 +450,11 @@ def update_link(
     db.commit()
     db.refresh(db_link)
     
-    # Обновляем кэш
     cache.delete_link_cache(db_link.short_code)
     cache.set_link_cache(db_link.short_code, db_link.original_url)
     
     return db_link
 
-# Endpoint для удаления ссылки
 @app.delete("/links/{short_code}", status_code=204)
 def delete_link(
     short_code: str,
@@ -463,16 +468,13 @@ def delete_link(
     
     if not db_link:
         raise HTTPException(status_code=404, detail="Link not found")
-    
-    # Проверяем, принадлежит ли ссылка текущему пользователю
+
     if db_link.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this link")
-    
-    # Деактивируем ссылку (soft delete)
+
     db_link.is_active = False
     db.commit()
     
-    # Удаляем из кэша
     cache.delete_link_cache(short_code)
     
     return None
@@ -482,8 +484,7 @@ def delete_link(
 def redirect_to_url(short_code: str, db: Session = Depends(get_db)):
     """Перенаправление по короткой ссылке с проверкой срока действия"""
     logger.debug(f"Redirecting short code: {short_code}")
-    
-    # Получаем ссылку из базы данных
+
     link = db.query(models.Link).filter(
         models.Link.short_code == short_code
     ).first()
@@ -491,13 +492,11 @@ def redirect_to_url(short_code: str, db: Session = Depends(get_db)):
     if not link:
         logger.warning(f"Link not found: {short_code}")
         raise HTTPException(status_code=404, detail="Link not found")
-    
-    # Проверяем, не истек ли срок действия
+
     if check_link_expiry(link, db):
         logger.warning(f"Link expired: {short_code}")
         raise HTTPException(status_code=404, detail="Link has expired")
-    
-    # Обновляем статистику
+
     link.clicks += 1
     link.last_used = datetime.now()
     db.commit()
@@ -528,30 +527,25 @@ async def shutdown_event():
 def test_shorten_link(link_request: dict):
     try:
         logger.debug(f"Received test link request: {link_request}")
-        
-        # Извлекаем данные из запроса
+
         original_url = link_request.get("original_url")
         custom_alias = link_request.get("custom_alias")
         expires_at_str = link_request.get("expires_at")
         
         if not original_url:
             return {"error": "Original URL is required"}
-        
-        # Генерируем короткий код
+    
         short_code = custom_alias or shortuuid.uuid()[:6]
-        
-        # Обрабатываем expires_at
+
         expires_at = None
         if expires_at_str:
             try:
-                # Преобразуем строку в datetime
                 expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
                 logger.debug(f"Parsed expires_at: {expires_at}")
             except Exception as e:
                 logger.error(f"Error parsing expires_at: {str(e)}")
                 return {"error": f"Invalid date format: {str(e)}"}
-        
-        # Возвращаем результат
+
         return {
             "short_code": short_code,
             "original_url": original_url,
