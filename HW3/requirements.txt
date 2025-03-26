@@ -1,13 +1,21 @@
 fastapi==0.103.1
-uvicorn==0.23.2
+uvicorn[standard]==0.23.2
 sqlalchemy==2.0.21
 pydantic==2.3.0
+pydantic[email]==2.3.0
 psycopg2-binary==2.9.7
 shortuuid==1.0.11
-python-jose==3.3.0
-passlib==1.7.4
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 redis==4.6.0
 python-multipart==0.0.6
 python-dotenv==1.0.0
 gunicorn==21.2.0
+httpx==0.24.1  # Для тестирования
+pytest==7.4.0
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1  # Для тестирования
+tenacity==8.2.3  # Для повторных попыток подключения
+loguru==0.7.0  # Улучшенное логирование
+

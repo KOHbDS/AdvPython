@@ -1,33 +1,32 @@
-from pydantic import BaseModel, HttpUrl, validator
-from typing import Optional, Union
+from pydantic import BaseModel, HttpUrl, EmailStr, Field
+from typing import Optional, Union, Annotated
 from datetime import datetime
 
 # Модели для пользователей
 class UserBase(BaseModel):
-    username: str
-    email: str
+    username: Annotated[str, Field(min_length=3, max_length=50)]
+    email: EmailStr
 
 class UserCreate(UserBase):
-    password: str
+    password: Annotated[str, Field(min_length=8)]
 
 class UserResponse(UserBase):
     id: int
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # Модели для ссылок
 class LinkBase(BaseModel):
-    original_url: str
+    original_url: HttpUrl
 
 class LinkCreate(LinkBase):
-    custom_alias: Optional[str] = None
+    custom_alias: Optional[Annotated[str, Field(min_length=3, max_length=50)]] = None
     expires_at: Optional[Union[str, datetime]] = None
 
 class LinkUpdate(BaseModel):
     original_url: Optional[HttpUrl] = None
-    custom_alias: Optional[str] = None
+    custom_alias: Optional[Annotated[str, Field(min_length=3, max_length=50)]] = None
     expires_at: Optional[datetime] = None
 
 class LinkResponse(BaseModel):
@@ -35,8 +34,7 @@ class LinkResponse(BaseModel):
     original_url: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class LinkStats(LinkResponse):
     clicks: int
@@ -44,8 +42,7 @@ class LinkStats(LinkResponse):
     expires_at: Optional[datetime] = None
     owner_id: Optional[int] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 # Модели для токенов
 class Token(BaseModel):
@@ -63,5 +60,4 @@ class ExpiredLinkResponse(BaseModel):
     expired_at: datetime
     total_clicks: int
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

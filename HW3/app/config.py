@@ -3,7 +3,7 @@ from typing import Optional
 
 # Базовые настройки
 SECRET_KEY = os.getenv("SECRET_KEY", "YOUR_SECRET_KEY")
-ALGORITHM = "HS256"
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 # Настройки базы данных
@@ -24,7 +24,7 @@ TESTING = os.getenv("TESTING", "False").lower() in ("true", "1", "t")
 DATABASE_URL_FROM_ENV: Optional[str] = os.getenv("DATABASE_URL")
 
 if TESTING:
-    DATABASE_URL = "sqlite:///./test.db"
+    DATABASE_URL = "sqlite:///:memory:"  # Изменено на in-memory SQLite
 elif DATABASE_URL_FROM_ENV:
     DATABASE_URL = DATABASE_URL_FROM_ENV
 else:
